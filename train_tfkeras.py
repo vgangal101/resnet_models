@@ -15,11 +15,9 @@ from train_utils.custom_callbacks import stop_acc_thresh, measure_img_sec
 from train_utils.data_augmentation import imgnt_data_aug, cifar10_data_aug, cifar100_data_aug
 from train_utils.preprocessing import imgnt_preproc, cifar10_preproc, cifar100_preproc
 
-#tf.debugging.set_log_device_placement(True)
-
 def get_args():
     parser = argparse.ArgumentParser(description='training configurations')
-    parser.add_argument('--model',type=str,help='choices are vgg11,vgg13,vgg16c,vgg16d,vgg19') # either vgg11,13,16,19 , now contains batch normalized options as well
+    parser.add_argument('--model',type=str,help='choices are ResNet18, ResNet34, ResNet50, ResNet101, ResNet152')
     parser.add_argument('--dataset',type=str,help='cifar10,cifar100,imagenet')
     parser.add_argument('--batch_size',type=int,default=256)
     # have the requirement that if the code is imagenet , then specify a path to dataset
