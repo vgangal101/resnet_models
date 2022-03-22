@@ -8,16 +8,19 @@ import matplotlib.pyplot as plt
 import scipy
 import atexit
 import time
+import tensorflow.keras.backend as K
 
 # training relevant imports
-from models.resnet_imgnt import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
-from train_utils.custom_callbacks import stop_acc_thresh, measure_img_sec
+
+from train_utils.custom_callbacks import stop_acc_thresh,measure_img_sec,lr_schedule_VGGnet
 from train_utils.data_augmentation import imgnt_data_aug, cifar10_data_aug, cifar100_data_aug
 from train_utils.preprocessing import imgnt_preproc, cifar10_preproc, cifar100_preproc
 
+#tf.debugging.set_log_device_placement(True)
+
 def get_args():
     parser = argparse.ArgumentParser(description='training configurations')
-    parser.add_argument('--model',type=str,help='choices are ResNet18, ResNet34, ResNet50, ResNet101, ResNet152')
+    parser.add_argument('--model',type=str,help='choices are vgg11,vgg13,vgg16c,vgg16d,vgg19') # either vgg11,13,16,19 , now contains batch normalized options as well
     parser.add_argument('--dataset',type=str,help='cifar10,cifar100,imagenet')
     parser.add_argument('--batch_size',type=int,default=256)
     # have the requirement that if the code is imagenet , then specify a path to dataset
@@ -26,7 +29,6 @@ def get_args():
     parser.add_argument('--lr',type=float,default=1e-2,help='learning rate to use')
     parser.add_argument('--momentum',type=float,default=0.9,help='value for momentum')
     parser.add_argument('--lr_schedule',type=str,default='constant',help='choice of learning rate scheduler')
-    parser.add_argument('--lr_plat_patience',type=int,default=5,help='patience of epochs before reducing lr')
     parser.add_argument('--img_size',type=tuple, default=(224,224,3),help='imagenet crop size')
     parser.add_argument('--data_aug',type=bool,default=True,help='use data augmentation or not')
     parser.add_argument('--early_stopping', type=bool, default=False, help='use early stopping')
@@ -34,9 +36,15 @@ def get_args():
     parser.add_argument('--save_checkpoints',type=bool,default=False,help='whether to save checkpoints or not')
     parser.add_argument('--checkpoint_frequency',type=int,default=5,help='checkpointing frequency')
     parser.add_argument('--checkpoint_dir',type=str,default='./checkpoints',help='where to save checkpoints')
+    parser.add_argument('--reload_checkpoint',type=str,help='checkpoint to resume training from')
     parser.add_argument('--num_gpus',type=int,default=1,help='number of gpus to use (on node)')
     parser.add_argument('--measure_img_sec',type=bool,default=False,help='measure img/sec')
     parser.add_argument('--resume_training',type=bool,default=False,help='resume_training')
+    parser.add_argument('--start_epoch',type=int,default=0,help='epoch to start at')
+    parser.add_argument('--custom_lr_schedule',type=bool,default=False,help='use a custom lr schedule or not')
+    parser.add_argument('--reduce_lr_on_plateau',type=bool,default=False,help='use the ReduceLrOnPlateau callback')
+    parser.add_argument('--lr_plat_patience',type=int,default=5,help='patience of epochs before reducing lr, use it with callback')
+    parser.add_argument('--min_lr',type=float,default=1e-4,help='lower bound on lr for ReduceLROnPlateau')
     args = parser.parse_args()
     return args
 
@@ -104,15 +112,12 @@ def plot_training(history,args):
     print('history.history=',history.history)
     accuracy = history.history['accuracy']
     val_accuracy = history.history['val_accuracy']
-    val_top1_acc = history.history['val_top1_acc']
-    val_top5_acc = history.history['val_top5_acc']
-
+    top5_acc = history.history['top5_acc']
     plt.figure()
     plt.title("Epoch vs Accuracy")
     plt.plot(accuracy,label='training accuracy')
     plt.plot(val_accuracy,label='val_accuracy')
-    plt.plot(val_top1_acc,label='val_top1_acc')
-    plt.plot(val_top5_acc,label='val_top5_acc')
+    plt.plot(top5_acc,label='top5 accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend(loc='lower right')
@@ -135,24 +140,22 @@ def plot_training(history,args):
     plt.savefig(viz_file2)
     plt.show()
 
+
 def get_model(args, num_classes, img_shape):
     model = None
-    if args.model.lower() == 'paper_vgg11':
-        model = paper_models.VGG11_A(num_classes,img_shape)
-    elif args.model.lower() == 'paper_vgg13':
-        model = paper_models.VGG13_B(num_classes,img_shape)
-    elif args.model.lower() == 'paper_vgg16c':
-        model = paper_models.VGG16_C(num_classes,img_shape)
-    elif args.model.lower() == 'paper_vgg16d':
-        model = paper_models.VGG16_D(num_classes,img_shape)
-    elif args.model.lower() == 'paper_vgg19e':
-        model = paper_models.VGG19_E(num_classes,img_shape)
-    elif args.model.lower() == 'bn_vgg16':
-        model = bn_vgg.bn_VGG16D(num_classes,img_shape)
-    elif args.model.lower() == 'bn_vgg19':
-        model = bn_vgg.bn_VGG19E(num_classes,img_shape)
+
+    if args.model == 'ResNet18':
+        model = ResNet18(input_shape=img_shape,num_classes=num_classes)
+    elif args.model == 'ResNet34':
+        model = ResNet34(input_shape=img_shape,num_classes=num_classes)
+    elif args.model == 'ResNet50':
+        model = ResNet50(input_shape=img_shape,num_classes=num_classes)
+    elif args.model == 'ResNet101':
+        model = ResNet101(input_shape=img_shape,num_classes=num_classes)
+    elif args.model == 'ResNet152':
+        model = ResNet152(input_shape=img_shape,num_classes=num_classes)
     else:
-        raise ValueError('Invalid value for the model name' + 'got model name= ' + args.model)
+        raise ValueError("Invalid model name got: ",args.model)
 
     return model
 
@@ -183,8 +186,6 @@ def get_callbacks_and_optimizer(args):
     callbacks = []
     optimizer = None
     momentum = args.momentum
-
-
 
     if args.lr_schedule == 'constant':
         optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr,momentum=momentum)
@@ -224,9 +225,10 @@ def get_callbacks_and_optimizer(args):
     else:
         raise ValueError('invalid value for learning rate scheduler got: ', args.lr_scheduler)
 
-    #ReduceLROnPlateau callback
-    reduce_lr_plat = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy',factor=0.1,patience=args.lr_plat_patience)
-    callbacks.append(reduce_lr_plat)
+
+    if args.reduce_lr_on_plateau:
+        reduce_lr_plat = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy',factor=0.1,patience=args.lr_plat_patience,min_lr=args.min_lr)
+        callbacks.append(reduce_lr_plat)
 
     if args.train_to_accuracy != 0:
         cb = stop_acc_thresh(args.train_to_accuracy)
@@ -244,6 +246,10 @@ def get_callbacks_and_optimizer(args):
 
     if args.measure_img_sec:
         callbacks.append(measure_img_sec(args.batch_size))
+
+    if args.custom_lr_schedule == True:
+        if args.dataset == 'imagenet' and args.model == 'VGG16':
+            callbacks.append(lr_schedule_VGGnet())
 
     return callbacks, optimizer
 
@@ -299,27 +305,27 @@ def main():
 
     print('preparing model')
     with strategy.scope():
-
-        # MODEL LOADING AND RESTORE CODE SEEMS TO FIT HERE !!
-        model = None
-
         if args.resume_training:
-            loaded_model = tf.keras.models.load_model(args.checkpoint_dir)
+            if args.reload_checkpoint == None:
+                raise RuntimeError('no checkpoint specified')
+
+            model = tf.keras.models.load_model(args.reload_checkpoint)
+            print('updating the learning rate, old lr = ', tf.keras.backend.get_value(model.optimizer.lr))
+            K.set_value(model.optimizer.lr,args.lr)
+            print('new lr',args.lr)
         else:
+            # MODEL LOADING AND RESTORE CODE SEEMS TO FIT HERE !!
             model = get_model(args,num_classes,img_shape)
             print('model is ready, model chosen=',args.model.lower())
 
             print('compiling model with essential necessities ....')
             model.compile(optimizer=optimizer,
-                        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                        metrics=['accuracy',tf.keras.metrics.SparseTopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.TopKCategoricalAccuracy(k=5,name='top5_acc')])
-
-
-
+                      loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                      metrics=['accuracy',tf.keras.metrics.SparseTopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5,name='top5_acc')])
 
     print("starting training")
     #time_start = time.time()
-    history = model.fit(train_dataset,epochs=args.num_epochs,validation_data=test_dataset,callbacks=callbacks)
+    history = model.fit(train_dataset,initial_epoch=args.start_epoch,epochs=args.num_epochs,validation_data=test_dataset,callbacks=callbacks)
     #time_end = time.time()
 
     #print('time to complete training',time_end-time_start)
@@ -330,19 +336,24 @@ def main():
     plot_training(history,args)
     print('plotting complete')
 
-    test_loss, test_acc = model.evaluate(test_dataset)
-    print("test_loss=",test_loss)
-    print("test_acc",test_acc)
+    save_to_dir = args.model.lower() + '_' + args.dataset.lower() + '_' + 'bs' + str(args.batch_size) + 'epochs' + str(args.num_epochs)
+    model.save(save_to_dir)
 
-    train_eval_log_file = open('./train_eval_file_' + args.model + '_' +  args.dataset + '_' + str(args.batch_size) + '.log', 'w')
+    test_loss, test_acc, top1_acc, top5_acc = model.evaluate(test_dataset)
+    print("test_loss=",test_loss)
+    print("test_acc=",test_acc)
+    print('top1_acc=',top1_acc)
+    print('top5_acc=',top5_acc)
+
+    train_eval_log_file = open('./train_eval_file_' + args.model + '_' +  args.dataset + '_' + str(args.batch_size) + 'epochs' + str(args.num_epochs) +  '.log', 'w')
 
     train_eval_log_file.write("test results\n")
 
     train_eval_log_file.write('test_loss' + '=' + str(test_loss) + '\n')
     train_eval_log_file.write('test_acc' + '=' + str(test_acc) + '\n')
+    train_eval_log_file.write('top1_acc' + '=' + str(top1_acc) + '\n')
+    train_eval_log_file.write('top5_acc' + '=' + str(top5_acc) + '\n')
 
-    save_to_dir = args.model.lower() + '_' + args.dataset.lower() + '_' +  str(args.batch_size)
-    model.save(save_to_dir)
     print("training and eval complete")
     atexit.register(strategy._extended._collective_ops._pool.close)
 
