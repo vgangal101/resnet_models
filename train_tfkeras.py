@@ -12,9 +12,12 @@ import tensorflow.keras.backend as K
 
 # training relevant imports
 
-from train_utils.custom_callbacks import stop_acc_thresh,measure_img_sec,lr_schedule_VGGnet
+from train_utils.custom_callbacks import stop_acc_thresh,measure_img_sec
 from train_utils.data_augmentation import imgnt_data_aug, cifar10_data_aug, cifar100_data_aug
 from train_utils.preprocessing import imgnt_preproc, cifar10_preproc, cifar100_preproc
+
+# model imports 
+from models.resnet_imgnt import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
 
 #tf.debugging.set_log_device_placement(True)
 
@@ -45,6 +48,8 @@ def get_args():
     parser.add_argument('--reduce_lr_on_plateau',type=bool,default=False,help='use the ReduceLrOnPlateau callback')
     parser.add_argument('--lr_plat_patience',type=int,default=5,help='patience of epochs before reducing lr, use it with callback')
     parser.add_argument('--min_lr',type=float,default=1e-4,help='lower bound on lr for ReduceLROnPlateau')
+    parser.add_argument('--decay_epochs',type=float,default=30,help='how many epochs for each decay')
+    parser.add_argument('--decay_rate',type=float,default=0.1,help='decay rate to use')
     args = parser.parse_args()
     return args
 
@@ -109,7 +114,7 @@ def get_dataset(args):
 
 
 def plot_training(history,args):
-    print('history.history=',history.history)
+    
     accuracy = history.history['accuracy']
     val_accuracy = history.history['val_accuracy']
     top5_acc = history.history['top5_acc']
@@ -212,15 +217,19 @@ def get_callbacks_and_optimizer(args):
         callbacks.append(lr_callback)
 
     elif args.lr_schedule == 'exp_decay':
-        optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr,momentum=momentum)
-        initial_learning_rate = args.lr
+#         optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr,momentum=momentum)
+#         initial_learning_rate = args.lr
 
-        def lr_exp_decay(epoch,lr):
-            k = 0.1
-            return initial_learning_rate * math.exp(-k*epoch)
+#         def lr_exp_decay(epoch,lr):
+#             k = 0.1
+#             return initial_learning_rate * math.exp(-k*epoch)
 
-        lr_callback = LearningRateScheduler(lr_exp_decay,verbose=1)
-        callbacks.append(lr_callback)
+#         lr_callback = LearningRateScheduler(lr_exp_decay,verbose=1)
+#         callbacks.append(lr_callback)
+        optimizer = tf.keras.optimizers.SGD(
+          tf.keras.optimizers.schedules.ExponentialDecay(args.lr, decay_steps = args.decay_epochs * 1281167 / args.batch_size, decay_rate = args.decay_rate), 
+          momentum = args.momentum);
+
 
     else:
         raise ValueError('invalid value for learning rate scheduler got: ', args.lr_scheduler)
@@ -324,6 +333,7 @@ def main():
                       metrics=['accuracy',tf.keras.metrics.SparseTopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5,name='top5_acc')])
 
     print("starting training")
+    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     #time_start = time.time()
     history = model.fit(train_dataset,initial_epoch=args.start_epoch,epochs=args.num_epochs,validation_data=test_dataset,callbacks=callbacks)
     #time_end = time.time()
