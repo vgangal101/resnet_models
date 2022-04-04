@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -281,7 +282,12 @@ def apply_data_aug(args,train_ds):
 
 
 def main():
+    
+    cmd_store = open("store_cmd.txt",'w')
+    cmd_store.write(str(sys.argv[1:]))
+    cmd_store.close()
 
+    
     args = get_args()
 
     num_classes, img_shape = get_dataset_props(args)
