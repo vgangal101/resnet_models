@@ -5,7 +5,9 @@ import numpy as np
 def normalize_image(image,label):
     return tf.cast(image,tf.float32) / 255., label
 
-
+def resize_img(img,label):
+    img = tf.image.resize_with_pad(img,target_height=224,target_width=224)
+    return img,label
 
 def imgnt_mean_substract1(image,label):
     #print(type(image))
@@ -42,12 +44,17 @@ def imgnt_preproc(train_ds,test_ds):
     return train_ds, test_ds
 
 def cifar10_preproc(train_ds,test_ds):
+    train_ds = train_ds.map(resize_img)
+    test_ds = test_ds.map(resize_img)
     train_ds = train_ds.map(RGBtoBGR_substractMeanRGBVal)
     test_ds = test_ds.map(RGBtoBGR_substractMeanRGBVal)
+    
     return train_ds, test_ds
 
 
 def cifar100_preproc(train_ds,test_ds):
+    train_ds = train_ds.map(resize_img)
+    test_ds = test_ds.map(resize_img)
     train_ds = train_ds.map(normalize_image)
     test_ds = test_ds.map(normalize_image)
     return train_ds, test_ds
