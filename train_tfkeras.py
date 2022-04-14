@@ -174,10 +174,10 @@ def get_dataset_props(args):
     if dataset_name == None:
         raise ValueError('No dataset specified. Exiting')
     elif dataset_name.lower() == 'cifar10':
-        img_shape = (32,32,3)
+        img_shape = (224,224,3)
         num_classes = 10
     elif dataset_name.lower() == 'cifar100':
-        img_shape = (32,32,3)
+        img_shape = (224,224,3)
         num_classes = 100
     elif dataset_name.lower() == 'imagenet':
         img_shape = (224,224,3)
