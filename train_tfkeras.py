@@ -10,10 +10,12 @@ import scipy
 import atexit
 import time
 import tensorflow.keras.backend as K
+import pathlib
+import os
 
 # training relevant imports
 
-from train_utils.custom_callbacks import stop_acc_thresh,measure_img_sec
+from train_utils.custom_callbacks import stop_acc_thresh, measure_img_sec, ResNetLRDecay
 from train_utils.data_augmentation import imgnt_data_aug, cifar10_data_aug, cifar100_data_aug
 from train_utils.preprocessing import imgnt_preproc, cifar10_preproc, cifar100_preproc
 
@@ -24,11 +26,12 @@ from models.resnet_imgnt import ResNet18, ResNet34, ResNet50, ResNet101, ResNet1
 
 def get_args():
     parser = argparse.ArgumentParser(description='training configurations')
-    parser.add_argument('--model',type=str,help='choices are vgg11,vgg13,vgg16c,vgg16d,vgg19') # either vgg11,13,16,19 , now contains batch normalized options as well
+    parser.add_argument('--model',type=str,help='choices are ResNet18, ResNet34, ResNet50, ResNet101, ResNet152') # either vgg11,13,16,19 , now contains batch normalized options as well
     parser.add_argument('--dataset',type=str,help='cifar10,cifar100,imagenet')
     parser.add_argument('--batch_size',type=int,default=256)
     # have the requirement that if the code is imagenet , then specify a path to dataset
     parser.add_argument('--imgnt_data_path',type=str,default='/data/petabyte/IMAGENET/Imagenet2012',help='only provide if imagenet is specified')
+    parser.add_argument('--imgnt_labels_file',type=str,default='./imagenet_labels.txt')
     parser.add_argument('--num_epochs',type=int,default=100,help='provide number of epochs to run')
     parser.add_argument('--lr',type=float,default=1e-2,help='learning rate to use')
     parser.add_argument('--momentum',type=float,default=0.9,help='value for momentum')
@@ -53,24 +56,49 @@ def get_args():
     parser.add_argument('--decay_rate',type=float,default=0.1,help='decay rate to use')
     args = parser.parse_args()
     return args
+    
+
+def get_imagenet_labels_classes(args):
+    label_map = {}
+    labels_file = args.imgnt_labels_file
+    
+    with open(labels_file,'r') as f:
+        for l in f.readlines():
+            proc_l = l.strip()
+            data = proc_l.split(' ')
+            imgnt_class = data[0]
+            real_class = ' '.join(data[1:])
+            label_map[imgnt_class] = real_class
+        
+    labels_list = list(label_map.values())
+    
+    return label_map, labels_list
+
 
 def get_imagenet_dataset(args):
-    print('loading imagenet dataset')
-    path_dir = args.imgnt_data_path
-
-    if 'train' in path_dir or 'val' in path_dir :
-        raise ValueError('Specify the root directory not the train directory for the imagenet dataset')
-
-    path_train = path_dir + '/train'
-    path_val = path_dir + '/val'
-
-    IMG_SIZE = args.img_size[:2]
-
-    train_dataset = tf.keras.utils.image_dataset_from_directory(path_train,image_size=IMG_SIZE,batch_size=args.batch_size)
-    val_dataset = tf.keras.utils.image_dataset_from_directory(path_val,image_size=IMG_SIZE, batch_size=args.batch_size)
-
-
-
+    
+    labels_map, labels_list = get_imagenet_labels_classes(args)
+    
+    base_dir = args.imgnt_data_path
+    
+    train_dir = os.path.join(base_dir,'train')
+    val_dir = os.path.join(base_dir,'val')
+    
+    print('Loading training dataset from memory')
+    train_dataset = tf.keras.utils.image_dataset_from_directory(train_dir,batch_size=args.batch_size,image_size=(256,256))
+    print('Loaded Training dataset')
+    val_dataset = tf.keras.utils.image_dataset_from_directory(val_dir,batch_size=args.batch_size,image_size=(256,256))
+    
+    # do random cropping here 
+    
+    print("doing Random Cropping on train_dataset")
+    train_dataset = train_dataset.map(lambda x,y: tf.image.random_crop(value=x,(224,224)), y)
+    print('Train_dataset random cropping complete')
+    
+    print('doing center crops on val dataset')
+    val_dataset = val_dataset.map(lambda x,y: tf.keras.layers.CenterCrop(224,224)(x), y)
+    print('Val Dataset Center Cropping complete')
+    
     return train_dataset, val_dataset
 
 
@@ -218,20 +246,9 @@ def get_callbacks_and_optimizer(args):
         callbacks.append(lr_callback)
 
     elif args.lr_schedule == 'exp_decay':
-#         optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr,momentum=momentum)
-#         initial_learning_rate = args.lr
-
-#         def lr_exp_decay(epoch,lr):
-#             k = 0.1
-#             return initial_learning_rate * math.exp(-k*epoch)
-
-#         lr_callback = LearningRateScheduler(lr_exp_decay,verbose=1)
-#         callbacks.append(lr_callback)
         optimizer = tf.keras.optimizers.SGD(
           tf.keras.optimizers.schedules.ExponentialDecay(args.lr, decay_steps = args.decay_epochs * 1281167 / args.batch_size, decay_rate = args.decay_rate), 
           momentum = args.momentum);
-
-
     else:
         raise ValueError('invalid value for learning rate scheduler got: ', args.lr_scheduler)
 
@@ -258,8 +275,9 @@ def get_callbacks_and_optimizer(args):
         callbacks.append(measure_img_sec(args.batch_size))
 
     if args.custom_lr_schedule == True:
-        if args.dataset == 'imagenet' and args.model == 'VGG16':
-            callbacks.append(lr_schedule_VGGnet())
+        if args.dataset == 'imagenet' and 'ResNet' in args.model:
+            schedule = tf.keras.callbacks.LearningRateScheduler(lr_schedule_ResNet)
+            callbacks.append(schedule)
 
     return callbacks, optimizer
 

@@ -15,7 +15,6 @@ class stop_acc_thresh(tf.keras.callbacks.Callback):
             print("\n Reached %2.2f accuracy" %(self.acc_thresh*100))
             self.model.stop_training = True
         print('val acc = %2.2f' %(logs.get('val_acc')))
-
         
 class measure_img_sec(tf.keras.callbacks.Callback):
     "Measure img_sec per batch and per epoch"""
@@ -56,5 +55,7 @@ class measure_img_sec(tf.keras.callbacks.Callback):
         print('overrall img_sec across all epochs=',overrall_img_sec)
         
         
-        
-        
+def LRDecayResNet(epoch,lr):
+    if epoch == 30 or epoch == 60 or epoch == 80:
+        return lr * 0.1
+    

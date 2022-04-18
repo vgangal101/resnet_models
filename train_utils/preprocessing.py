@@ -23,6 +23,20 @@ def imgnt_mean_substract2(image,label):
     image -= 1.
     return image,label
 
+def imgnt_normalize_mean_substract(image,label):
+    image = image / 255.0
+    mean_tensor = -1.0 * tf.constant([0.485,0.456,0.406])
+    std = tf.constant([0.229,0.224,0.225])
+    
+    if image.dtype != mean_tensor.dtype:
+        image = tf.add(image, tf.cast(mean_tensor, image.dtype))
+    else:
+        image = tf.add(image, mean_tensor)
+    
+    image /= std
+    
+    return image
+
 
 def RGBtoBGR_substractMeanRGBVal(image,label):
     """
@@ -38,10 +52,10 @@ def RGBtoBGR_substractMeanRGBVal(image,label):
     return image, label
  
 
-def imgnt_preproc(train_ds,test_ds):
-    train_ds = train_ds.map(imgnt_mean_substract2)
-    test_ds = test_ds.map(imgnt_mean_substract2)
-    return train_ds, test_ds
+def imgnt_preproc(train_ds,val_ds):
+    train_ds = train_ds.map(imgnt_normalize_mean_substract)
+    val_ds = val_ds.map(imgnt_normalize_mean_substract)
+    return train_ds, val_ds
 
 def cifar10_preproc(train_ds,test_ds):
     train_ds = train_ds.map(resize_img)
