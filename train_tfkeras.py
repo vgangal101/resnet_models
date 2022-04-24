@@ -91,12 +91,19 @@ def get_imagenet_dataset(args):
     
     # do random cropping here 
     
+    def random_crop_op(img,label):
+        return tf.keras.layers.RandomCrop(224,224)(img), label
+    
+    def center_crop(img,label):
+        return tf.keras.layers.CenterCrop(224,224)(img), label
+    
+    
     print("doing Random Cropping on train_dataset")
-    train_dataset = train_dataset.map(lambda x,y: tf.image.random_crop(value=x,(224,224)), y)
+    train_dataset = train_dataset.map(random_crop_op, num_parallel_calls=tf.data.AUTOTUNE)
     print('Train_dataset random cropping complete')
     
     print('doing center crops on val dataset')
-    val_dataset = val_dataset.map(lambda x,y: tf.keras.layers.CenterCrop(224,224)(x), y)
+    val_dataset = val_dataset.map(center_crop, num_parallel_calls=tf.data.AUTOTUNE)
     print('Val Dataset Center Cropping complete')
     
     return train_dataset, val_dataset
@@ -275,9 +282,8 @@ def get_callbacks_and_optimizer(args):
         callbacks.append(measure_img_sec(args.batch_size))
 
     if args.custom_lr_schedule == True:
-        if args.dataset == 'imagenet' and 'ResNet' in args.model:
-            schedule = tf.keras.callbacks.LearningRateScheduler(lr_schedule_ResNet)
-            callbacks.append(schedule)
+        schedule = tf.keras.callbacks.LearningRateScheduler(ResNetLRDecay)
+        callbacks.append(schedule)
 
     return callbacks, optimizer
 
