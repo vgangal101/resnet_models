@@ -35,7 +35,7 @@ def imgnt_normalize_mean_substract(image,label):
     
     image /= std
     
-    return image
+    return image , label
 
 
 def RGBtoBGR_substractMeanRGBVal(image,label):
