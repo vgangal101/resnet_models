@@ -55,7 +55,9 @@ class measure_img_sec(tf.keras.callbacks.Callback):
         print('overrall img_sec across all epochs=',overrall_img_sec)
         
         
-def LRDecayResNet(epoch,lr):
+def ResNetLRDecay(epoch,lr):
     if epoch == 30 or epoch == 60 or epoch == 80:
         return lr * 0.1
+    else:
+        return lr
     
