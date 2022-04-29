@@ -69,7 +69,7 @@ def ResNet50(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000)(out)
+    out = keras.layers.Dense(1000,activation='softmax')(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
@@ -111,7 +111,7 @@ def ResNet101(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000)(out)
+    out = keras.layers.Dense(1000,activation='softmax')(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
@@ -184,7 +184,7 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000)(out)
+    out = keras.layers.Dense(1000,activation='softmax')(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
@@ -248,7 +248,7 @@ def ResNet18(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000)(out)
+    out = keras.layers.Dense(1000,activation='softmax')(out)
     #out = keras.layers.Activation('softmax')(out)
 
     return keras.Model(inputs=in_tensor,outputs=out)
@@ -294,6 +294,6 @@ def ResNet34(input_shape=(224,224,3),num_classes=1000):
 
     out = keras.layers.GlobalAveragePooling2D()(out)
 
-    out = keras.layers.Dense(1000)(out)
+    out = keras.layers.Dense(1000,activation='softmax')(out)
 
     return keras.Model(inputs=in_tensor,outputs=out)
