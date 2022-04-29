@@ -60,4 +60,11 @@ def ResNetLRDecay(epoch,lr):
         return lr * 0.1
     else:
         return lr
-    
+
+def ResNetLRDecay2(epoch,lr):
+    if epoch == 21:
+        return 1e-2
+    elif epoch == 26:
+        return 1e-3 
+    else: 
+        return lr
