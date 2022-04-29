@@ -85,9 +85,9 @@ def get_imagenet_dataset(args):
     val_dir = os.path.join(base_dir,'val')
     
     print('Loading training dataset from memory')
-    train_dataset = tf.keras.utils.image_dataset_from_directory(train_dir,batch_size=args.batch_size,image_size=(256,256))
+    train_dataset = tf.keras.utils.image_dataset_from_directory(train_dir,batch_size=args.batch_size,label_mode='categorical',image_size=(256,256))
     print('Loaded Training dataset')
-    val_dataset = tf.keras.utils.image_dataset_from_directory(val_dir,batch_size=args.batch_size,image_size=(256,256))
+    val_dataset = tf.keras.utils.image_dataset_from_directory(val_dir,batch_size=args.batch_size,label_mode='categorical',image_size=(256,256))
     
     # do random cropping here 
     
@@ -359,8 +359,8 @@ def main():
 
             print('compiling model with essential necessities ....')
             model.compile(optimizer=optimizer,
-                      loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                      metrics=['accuracy',tf.keras.metrics.SparseTopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5,name='top5_acc')])
+                      loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+                      metrics=['accuracy',tf.keras.metrics.TopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.TopKCategoricalAccuracy(k=5,name='top5_acc')])
 
     print("starting training")
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
