@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument('--imgnt_data_path',type=str,default='/data/petabyte/IMAGENET/Imagenet2012',help='only provide if imagenet is specified')
     parser.add_argument('--imgnt_labels_file',type=str,default='./imagenet_labels.txt')
     parser.add_argument('--num_epochs',type=int,default=100,help='provide number of epochs to run')
-    parser.add_argument('--lr',type=float,default=1e-2,help='learning rate to use')
+    parser.add_argument('--lr',type=float,default=1e-1,help='learning rate to use')
     parser.add_argument('--momentum',type=float,default=0.9,help='value for momentum')
     parser.add_argument('--lr_schedule',type=str,default='constant',help='choice of learning rate scheduler')
     parser.add_argument('--img_size',type=tuple, default=(224,224,3),help='imagenet crop size')
@@ -153,12 +153,15 @@ def plot_training(history,args):
     
     accuracy = history.history['accuracy']
     val_accuracy = history.history['val_accuracy']
-    top5_acc = history.history['top5_acc']
+    #top5_acc = history.history['top5_acc']
+    val_top1_acc = history.history['val_top1_acc']
+    val_top5_acc = history.history['val_top5_acc']
     plt.figure()
     plt.title("Epoch vs Accuracy")
     plt.plot(accuracy,label='training accuracy')
     plt.plot(val_accuracy,label='val_accuracy')
-    plt.plot(top5_acc,label='top5 accuracy')
+    plt.plot(val_top1_acc,label='top1 accuracy')
+    plt.plot(val_top5_acc,label='top5 accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend(loc='lower right')
@@ -359,7 +362,7 @@ def main():
 
             print('compiling model with essential necessities ....')
             model.compile(optimizer=optimizer,
-                      loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+                      loss=keras.losses.CategoricalCrossentropy(from_logits=False),
                       metrics=['accuracy',tf.keras.metrics.TopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.TopKCategoricalAccuracy(k=5,name='top5_acc')])
 
     print("starting training")
