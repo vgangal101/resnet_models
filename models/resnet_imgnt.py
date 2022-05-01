@@ -2,25 +2,43 @@ import tensorflow as tf
 from tensorflow import keras
 
 def conv_block(input,filters,downsample=False):
+    
+    # IS THE PADDING ALWAYS SAME ??????
     if downsample == True :
-        out = keras.layers.Conv2D(filters[0],(1,1), strides = 2, padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
-        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
+        out = keras.layers.Conv2D(filters[0],(1,1), strides = 2, padding = 'same',
+                                  kernel_initializer='he_normal',bias_initializer='he_normal',
+                                  kernel_regularizer= tf.keras.regularizers.L2(l2=1e-4),
+                                  bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input)
+        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=2,padding='same',kernel_initializer='he_normal',
+                                       bias_initializer='he_normal', 
+                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
         shortcut = keras.layers.BatchNormalization()(shortcut)
     else:
 
-        out = keras.layers.Conv2D(filters[0],(1,1),padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
-        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=1,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
+        out = keras.layers.Conv2D(filters[0],(1,1),padding = 'same',
+                                  kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
+        
+        # THIS LOOKS FISHY !!!, doesnt identity shortcut need to be equal to the input tensor ?????, IS there even supposed to be a conv layer  here ? 
+        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=1,padding='same',
+                                       kernel_initializer='he_normal',bias_initializer='he_normal',
+                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
         shortcut = keras.layers.BatchNormalization()(shortcut)
 
 
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
-    out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(out)
+    out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+    
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
-    out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(out)
+    out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
     out = tf.keras.layers.BatchNormalization()(out)
 
     short_cut_add = tf.keras.layers.Add()([shortcut,out])
@@ -191,7 +209,7 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
 
 
-
+# RENAME 'input' to be 'input_tensor', no conflict with reserved keyword 
 def identity_residual_block(input,num_filters,downsample=False):
     if downsample == True :
         x = keras.layers.Conv2D(num_filters,(3,3), strides = 2, padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
