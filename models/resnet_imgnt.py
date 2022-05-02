@@ -1,16 +1,19 @@
 import tensorflow as tf
 from tensorflow import keras
 
-def conv_block(input,filters,downsample=False):
-    
-    # IS THE PADDING ALWAYS SAME ??????
+def conv_block(input_tensor,filters,downsample=False):
+    """
+    BottleNeck block as described in paper
+    """
+
+
     if downsample == True :
         out = keras.layers.Conv2D(filters[0],(1,1), strides = 2, padding = 'same',
                                   kernel_initializer='he_normal',bias_initializer='he_normal',
                                   kernel_regularizer= tf.keras.regularizers.L2(l2=1e-4),
                                   bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input)
         shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=2,padding='same',kernel_initializer='he_normal',
-                                       bias_initializer='he_normal', 
+                                       bias_initializer='he_normal',
                                        kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
         shortcut = keras.layers.BatchNormalization()(shortcut)
     else:
@@ -18,12 +21,7 @@ def conv_block(input,filters,downsample=False):
         out = keras.layers.Conv2D(filters[0],(1,1),padding = 'same',
                                   kernel_initializer='he_normal',bias_initializer='he_normal',
                                  kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
-        
-        # THIS LOOKS FISHY !!!, doesnt identity shortcut need to be equal to the input tensor ?????, IS there even supposed to be a conv layer  here ? 
-        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=1,padding='same',
-                                       kernel_initializer='he_normal',bias_initializer='he_normal',
-                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
-        shortcut = keras.layers.BatchNormalization()(shortcut)
+        shortcut = input_tensor
 
 
     out = tf.keras.layers.BatchNormalization()(out)
@@ -32,7 +30,7 @@ def conv_block(input,filters,downsample=False):
     out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
                                  kernel_initializer='he_normal',bias_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
-    
+
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
@@ -54,7 +52,9 @@ def ResNet50(input_shape=(224,224,3),num_classes=1000):
     #out = tf.keras.layers.ZeroPadding2D((3,3))(in_tensor)
 
     # conv1_x layer
-    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(in_tensor)
+    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',
+                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(in_tensor)
     out = keras.layers.BatchNormalization()(out)
     out = keras.layers.Activation('relu')(out)
 
@@ -87,7 +87,8 @@ def ResNet50(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000,activation='softmax')(out)
+    out = keras.layers.Dense(1000,activation='softmax',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
@@ -129,7 +130,8 @@ def ResNet101(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000,activation='softmax')(out)
+    out = keras.layers.Dense(1000,activation='softmax',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
@@ -138,7 +140,9 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
     in_tensor = tf.keras.Input(input_shape)
     # conv1_x layer
-    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(in_tensor)
+    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',
+                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(in_tensor)
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
@@ -202,27 +206,37 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000,activation='softmax')(out)
+    out = keras.layers.Dense(1000,activation='softmax',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     return tf.keras.Model(inputs=in_tensor,outputs=out)
 
 
 
 
-# RENAME 'input' to be 'input_tensor', no conflict with reserved keyword 
-def identity_residual_block(input,num_filters,downsample=False):
+# RENAME 'input' to be 'input_tensor', no conflict with reserved keyword
+def identity_residual_block(input_tensor,num_filters,downsample=False):
     if downsample == True :
-        x = keras.layers.Conv2D(num_filters,(3,3), strides = 2, padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
-        shortcut = keras.layers.Conv2D(num_filters,(1,1),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
+        x = keras.layers.Conv2D(num_filters,(3,3), strides=2, padding = 'same',
+                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
+        shortcut = keras.layers.Conv2D(num_filters,(1,1),strides=2,padding='same',
+                                    kernel_initializer='he_normal',bias_initializer='he_normal',
+                                    kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
         shortcut = keras.layers.BatchNormalization()(shortcut)
     else:
-        x = keras.layers.Conv2D(num_filters,(3,3),padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(input)
-        shortcut = input
+        x = keras.layers.Conv2D(num_filters,(3,3),padding = 'same',
+                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
+        shortcut = input_tensor
 
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Activation('relu')(x)
 
-    x = keras.layers.Conv2D(num_filters,(3,3),padding = 'same',kernel_initializer='he_normal',bias_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(num_filters,(3,3),padding='same',
+                            kernel_initializer='he_normal',bias_initializer='he_normal',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(x)
+
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Activation('relu')(x)
 
@@ -237,7 +251,9 @@ def ResNet18(input_shape=(224,224,3),num_classes=1000):
     in_tensor = keras.Input(input_shape)
 
     # conv1_x layer
-    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(in_tensor)
+    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',
+                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(in_tensor)
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
     #print('conv1x layer output shape',out.shape)
@@ -266,7 +282,8 @@ def ResNet18(input_shape=(224,224,3),num_classes=1000):
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-    out = keras.layers.Dense(1000,activation='softmax')(out)
+    out = keras.layers.Dense(1000,activation='softmax',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
     #out = keras.layers.Activation('softmax')(out)
 
     return keras.Model(inputs=in_tensor,outputs=out)
@@ -277,7 +294,8 @@ def ResNet34(input_shape=(224,224,3),num_classes=1000):
     in_tensor = keras.Input(input_shape)
 
     # conv1_x layer
-    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal')(in_tensor)
+    out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',kernel_initializer='he_normal',bias_initializer='he_normal',
+                             kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(in_tensor)
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
     #print('conv1x layer output shape',out.shape)
@@ -312,6 +330,7 @@ def ResNet34(input_shape=(224,224,3),num_classes=1000):
 
     out = keras.layers.GlobalAveragePooling2D()(out)
 
-    out = keras.layers.Dense(1000,activation='softmax')(out)
+    out = keras.layers.Dense(1000,activation='softmax',
+                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     return keras.Model(inputs=in_tensor,outputs=out)
