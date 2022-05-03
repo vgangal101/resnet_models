@@ -359,7 +359,7 @@ def main():
 
             print('compiling model with essential necessities ....')
             model.compile(optimizer=optimizer,
-                      loss=keras.losses.CategoricalCrossentropy(from_logits=True),
+                      loss=keras.losses.CategoricalCrossentropy(from_logits=False),
                       metrics=['accuracy',tf.keras.metrics.TopKCategoricalAccuracy(k=1,name='top1_acc'),tf.keras.metrics.TopKCategoricalAccuracy(k=5,name='top5_acc')])
 
     print("starting training")
