@@ -1,31 +1,21 @@
 import tensorflow as tf
 from tensorflow import keras
 
-def conv_block(input_tensor,filters,downsample=False):
+def bottleneck_conv_block(input_tensor,filters,strides=(2,2)):
     """
-    BottleNeck block as described in paper
+    stride is 2x2 unless mentioned otherwise, only conv stage 2 has stride of 1,
+     otherwise starting from stage 3 onwards the stride is of 2( which is default )
+
     """
 
-
-    if downsample == True :
-        out = keras.layers.Conv2D(filters[0],(1,1), strides = 2, padding = 'valid',
-                                  kernel_initializer='he_normal',bias_initializer='he_normal',
-                                  kernel_regularizer= tf.keras.regularizers.L2(l2=1e-4),
-                                  bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input)
-        shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=2,padding='same',kernel_initializer='he_normal',
-                                       bias_initializer='he_normal',
-                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
-        shortcut = keras.layers.BatchNormalization()(shortcut)
-    else:
-
-        out = keras.layers.Conv2D(filters[0],(1,1),padding = 'valid',
-                                  kernel_initializer='he_normal',bias_initializer='he_normal',
-                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
-        shortcut = input_tensor
-
+    out = keras.layers.Conv2D(filters[0],(1,1),strides=strides, padding = 'valid',
+                              kernel_initializer='he_normal',bias_initializer='he_normal',
+                              kernel_regularizer= tf.keras.regularizers.L2(l2=1e-4),
+                              bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
 
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
+
 
     out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
                                  kernel_initializer='he_normal',bias_initializer='he_normal',
@@ -37,12 +27,61 @@ def conv_block(input_tensor,filters,downsample=False):
     out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='valid',
                                  kernel_initializer='he_normal',bias_initializer='he_normal',
                                  kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+
     out = tf.keras.layers.BatchNormalization()(out)
 
-    short_cut_add = tf.keras.layers.Add()([shortcut,out])
+
+    # let shortcut handling happen last
+
+    # compute the shortcut
+    shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=strides,padding='same',kernel_initializer='he_normal',
+                                   bias_initializer='he_normal',
+                                   kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
+    shortcut = keras.layers.BatchNormalization()(shortcut)
+
+    # add
+    shortcut_add = tf.keras.layers.Add()([shortcut,out])
+
+    # apply activation function
+    final_out = tf.keras.layers.Activation('relu')(shortcut_add)
+
+    return final_out
+
+def bottleneck_identity_block(input_tensor,filters):
+
+
+    out = keras.layers.Conv2D(filters[0], (1,1), strides=1, padding = 'valid',
+                              kernel_initializer ='he_normal',bias_initializer = 'he_normal',
+                              kernel_regularizer = tf.keras.regularizers.L2(l2=1e-4),
+                              bias_regularizer = tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
+
+    out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
-    return short_cut_add
+
+    out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+
+    out = tf.keras.layers.BatchNormalization()(out)
+    out = tf.keras.layers.Activation('relu')(out)
+
+    out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='valid',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+
+    out = tf.keras.layers.BatchNormalization()(out)
+
+    # let shortcut handling happen last
+    shortcut = input_tensor
+
+    shortcut_add = tf.keras.layers.Add()([shortcut,out])
+
+    final_out = tf.keras.layers.Activation('relu')(shortcut_add)
+
+    return final_out
+
+
 
 
 def ResNet50(input_shape=(224,224,3),num_classes=1000):
@@ -61,30 +100,31 @@ def ResNet50(input_shape=(224,224,3),num_classes=1000):
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
-    out = conv_block(out,[64,64,256],downsample=False)
-    out = conv_block(out,[64,64,256],downsample=False)
-    out = conv_block(out,[64,64,256],downsample=False)
+
+    out = bottleneck_conv_block(out,[64,64,256],strides=(1,1))
+    out = bottleneck_identity_block(out,[64,64,256])
+    out = bottleneck_identity_block(out,[64,64,256])
     #print('out.shape=',out.shape)
 
     # conv3_x layer
-    out = conv_block(out,[128,128,512],downsample=True)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
+    out = bottleneck_conv_block(out,[128,128,512],strides=(2,2))
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
 
-    # conv4_x layer
-    out = conv_block(out,[256,256,1024],downsample=True)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
 
-    #conv5_x layer
-    out = conv_block(out,[512,512,2048],downsample=True)
-    out = conv_block(out,[512,512,2048],downsample=False)
-    out = conv_block(out,[512,512,2048],downsample=False)
+    # conv4x layer
+    out = bottleneck_conv_block(out,[256,256,1024],strides=(2,2))
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
 
+    # conv5x layer
+    out = bottleneck_conv_block(out,[512,512,2048],strides=(2,2))
+    out = bottleneck_identity_block(out,[512,512,2048])
+    out = bottleneck_identity_block(out,[512,512,2048])
 
     out = keras.layers.GlobalAveragePooling2D()(out)
     out = keras.layers.Dense(1000,activation='softmax',
@@ -105,28 +145,49 @@ def ResNet101(input_shape=(224,224,3),num_classes=1000):
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
-    out = conv_block(out,[64,64,256],downsample=True)
-    out = conv_block(out,[64,64,256],downsample=False)
-    out = conv_block(out,[64,64,256],downsample=False)
+
+    out = bottleneck_conv_block(out,[64,64,256],strides=(1,1))
+    out = bottleneck_identity_block(out,[64,64,256])
+    out = bottleneck_identity_block(out,[64,64,256])
+    #print('out.shape=',out.shape)
 
     # conv3_x layer
-    out = conv_block(out,[128,128,512],downsample=True)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
+    out = bottleneck_conv_block(out,[128,128,512],strides=(2,2))
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
 
-    # conv4_x layer
-    out = conv_block(out,[256,256,1024],downsample=True)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
 
-    #conv5_x layer
-    out = conv_block(out,[512,512,2048],downsample=True)
-    out = conv_block(out,[512,512,2048],downsample=False)
-    out = conv_block(out,[512,512,2048],downsample=False)
+    # conv4x layer
+    out = bottleneck_conv_block(out,[256,256,1024],strides=(2,2))
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+
+    # conv5x layer
+    out = bottleneck_conv_block(out,[512,512,2048],strides=(2,2))
+    out = bottleneck_identity_block(out,[512,512,2048])
+    out = bottleneck_identity_block(out,[512,512,2048])
+
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
@@ -146,63 +207,51 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
-    out = conv_block(out,[64,64,256],downsample=False)
-    out = conv_block(out,[64,64,256],downsample=False)
-    out = conv_block(out,[64,64,256],downsample=False)
+    out = bottleneck_conv_block(out,[64,64,256],strides=(1,1))
+    out = bottleneck_identity_block(out,[64,64,256])
+    out = bottleneck_identity_block(out,[64,64,256])
+    #print('out.shape=',out.shape)
 
     # conv3_x layer
-    out = conv_block(out,[128,128,512],downsample=True)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
-    out = conv_block(out,[128,128,512],downsample=False)
+    out = bottleneck_conv_block(out,[128,128,512],strides=(2,2))
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
+    out = bottleneck_identity_block(out,[128,128,512])
 
 
-    # conv4_x layer
-    out = conv_block(out,[256,256,1024],downsample=True)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
-    out = conv_block(out,[256,256,1024],downsample=False)
+    # conv4x layer
+    out = bottleneck_conv_block(out,[256,256,1024],strides=(2,2))
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
+    out = bottleneck_identity_block(out,[256,256,1024])
 
-    #conv5_x layer
-    out = conv_block(out,[512,512,2048],downsample=True)
-    out = conv_block(out,[512,512,2048],downsample=False)
-    out = conv_block(out,[512,512,2048],downsample=False)
+    # conv5x layer
+    out = bottleneck_conv_block(out,[512,512,2048],strides=(2,2))
+    out = bottleneck_identity_block(out,[512,512,2048])
+    out = bottleneck_identity_block(out,[512,512,2048])
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
@@ -213,37 +262,68 @@ def ResNet152(input_shape=(224,224,3),num_classes=1000):
 
 
 
+def BasicResidualBlock_identity_block(input_tensor,num_filters,strides=(2,2)):
 
-# RENAME 'input' to be 'input_tensor', no conflict with reserved keyword
-def identity_residual_block(input_tensor,num_filters,downsample=False):
-    if downsample == True :
-        x = keras.layers.Conv2D(num_filters,(3,3), strides=2, padding = 'same',
-                                kernel_initializer='he_normal',bias_initializer='he_normal',
+
+    out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+
+    out = tf.keras.layers.BatchNormalization()(out)
+    out = tf.keras.layers.Activation('relu')(out)
+
+    out = tf.keras.layers.Conv2D(filters[2],(3,3),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
+
+    out = tf.keras.layers.BatchNormalization()(out)
+
+    # let shortcut handling happen last
+    shortcut = input_tensor
+
+    shortcut_add = tf.keras.layers.Add()([shortcut,out])
+
+    final_out = tf.keras.layers.Activation('relu')(shortcut_add)
+
+
+    return final_out
+
+
+def BasicResidualBlock_conv_block(input_tensor,num_filters,strides=(2,2)):
+
+
+    out = tf.keras.layers.Conv2D(filters[0],(3,3),strides=strides,padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
-        shortcut = keras.layers.Conv2D(num_filters,(1,1),strides=2,padding='valid',
-                                    kernel_initializer='he_normal',bias_initializer='he_normal',
-                                    kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
-        shortcut = keras.layers.BatchNormalization()(shortcut)
-    else:
-        x = keras.layers.Conv2D(num_filters,(3,3),padding = 'same',
-                                kernel_initializer='he_normal',bias_initializer='he_normal',
-                                kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
-        shortcut = input_tensor
 
-    x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation('relu')(x)
+    out = tf.keras.layers.BatchNormalization()(out)
+    out = tf.keras.layers.Activation('relu')(out)
 
-    x = keras.layers.Conv2D(num_filters,(3,3),padding='same',
-                            kernel_initializer='he_normal',bias_initializer='he_normal',
-                            kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(x)
+    out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
+                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
-    x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation('relu')(x)
+    out = tf.keras.layers.BatchNormalization()(out)
 
-    x = keras.layers.Add()([x,shortcut])
-    x = keras.layers.Activation('relu')(x)
+    # compute the shortcut
+    shortcut = keras.layers.Conv2D(filters[1],(1,1),strides=strides,padding='same',kernel_initializer='he_normal',
+                                   bias_initializer='he_normal',
+                                   kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
+    shortcut = keras.layers.BatchNormalization()(shortcut)
 
-    return x
+    # add
+    shortcut_add = tf.keras.layers.Add()([shortcut,out])
+
+    # apply activation function
+    final_out = tf.keras.layers.Activation('relu')(shortcut_add)
+
+    return final_out
+
+
+    return final_out
+
+
+
 
 
 def ResNet18(input_shape=(224,224,3),num_classes=1000):
@@ -261,24 +341,20 @@ def ResNet18(input_shape=(224,224,3),num_classes=1000):
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
-    out = identity_residual_block(out,64,downsample=False)
-    out = identity_residual_block(out,64,downsample=False)
-    #print('conv2x layer output shape',out.shape)
+    out = BasicResidualBlock_conv_block(out,[64,64],strides=(1,1))
+    out = BasicResidualBlock_identity_block(out,[64,64])
 
-    # conv3_x layer
-    out = identity_residual_block(out,128,downsample=True)
-    out = identity_residual_block(out,128,downsample=False)
-    #print('conv3x layer output shape',out.shape)
+    # conv 3x layer
+    out = BasicResidualBlock_conv_block(out,[128,128],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[128,128])
 
-    # conv4_x layer
-    out = identity_residual_block(out,256,downsample=True)
-    out = identity_residual_block(out,256,downsample=False)
-    #print('conv4x layer output shape',out.shape)
+    # conv 4x layer
+    out = BasicResidualBlock_conv_block(out,[256,256],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[256,256])
 
-    # conv5_x layer
-    out = identity_residual_block(out,512,downsample=True)
-    out = identity_residual_block(out,512,downsample=False)
-    #print('conv4x layer output shape',out.shape)
+    # conv 5x layer
+    out = BasicResidualBlock_conv_block(out,[512,512],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[512,512])
 
 
     out = keras.layers.GlobalAveragePooling2D()(out)
@@ -303,34 +379,33 @@ def ResNet34(input_shape=(224,224,3),num_classes=1000):
 
     # conv2_x layer
     out = keras.layers.MaxPool2D((3,3),strides=2,padding='same')(out)
-    out = identity_residual_block(out,64,downsample=False) # erroring out here received shapes (28,28,64) and (55,55,64)
-    out = identity_residual_block(out,64,downsample=False)
-    #print('conv2x layer output shape',out.shape)
+    out = BasicResidualBlock_conv_block(out,[64,64],strides=(1,1))
+    out = BasicResidualBlock_identity_block(out,[64,64])
+    out = BasicResidualBlock_identity_block(out,[64,64])
+
+    # conv 3x layer
+    out = BasicResidualBlock_conv_block(out,[128,128],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[128,128])
+    out = BasicResidualBlock_identity_block(out,[128,128])
+    out = BasicResidualBlock_identity_block(out,[128,128])
 
 
-    # conv3_x layer
-    out = identity_residual_block(out,128,downsample=True)
-    out = identity_residual_block(out,128,downsample=False)
-    out = identity_residual_block(out,128,downsample=False)
-    out = identity_residual_block(out,128,downsample=False)
-    #print('conv3x layer output shape',out.shape)
+    # conv 4x layer
+    out = BasicResidualBlock_conv_block(out,[256,256],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[256,256])
+    out = BasicResidualBlock_identity_block(out,[256,256])
+    out = BasicResidualBlock_identity_block(out,[256,256])
+    out = BasicResidualBlock_identity_block(out,[256,256])
+    out = BasicResidualBlock_identity_block(out,[256,256])
 
-    # conv4_x layer
-    out = identity_residual_block(out,256,downsample=True)
-    out = identity_residual_block(out,256,downsample=False)
-    out = identity_residual_block(out,256,downsample=False)
-    out = identity_residual_block(out,256,downsample=False)
-    #print('conv4x layer output shape',out.shape)
+    # conv 5x layer
+    out = BasicResidualBlock_conv_block(out,[512,512],strides=(2,2))
+    out = BasicResidualBlock_identity_block(out,[512,512])
+    out = BasicResidualBlock_identity_block(out,[512,512])
 
-    # conv5_x layer
-    out = identity_residual_block(out,512,downsample=True)
-    out = identity_residual_block(out,512,downsample=False)
-    out = identity_residual_block(out,512,downsample=False)
-    #print('conv5x layer output shape',out.shape)
 
     out = keras.layers.GlobalAveragePooling2D()(out)
-
     out = keras.layers.Dense(1000,activation='softmax',
                             kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
-
+    
     return keras.Model(inputs=in_tensor,outputs=out)
