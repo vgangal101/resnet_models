@@ -14,13 +14,13 @@ def conv_block(input_tensor,filters,downsample=False):
                                   bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input)
         shortcut = keras.layers.Conv2D(filters[2],(1,1),strides=2,padding='same',kernel_initializer='he_normal',
                                        bias_initializer='he_normal',
-                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
+                                       kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
         shortcut = keras.layers.BatchNormalization()(shortcut)
     else:
 
         out = keras.layers.Conv2D(filters[0],(1,1),padding = 'valid',
                                   kernel_initializer='he_normal',bias_initializer='he_normal',
-                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input)
+                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
         shortcut = input_tensor
 
 
