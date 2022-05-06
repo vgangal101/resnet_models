@@ -320,9 +320,6 @@ def BasicResidualBlock_conv_block(input_tensor,num_filters,strides=(2,2)):
     return final_out
 
 
-    return final_out
-
-
 
 
 
