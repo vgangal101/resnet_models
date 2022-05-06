@@ -88,7 +88,7 @@ def get_imagenet_dataset(args):
     train_dataset = tf.keras.utils.image_dataset_from_directory(train_dir,batch_size=args.batch_size,label_mode='categorical',image_size=(256,256))
     print('Loaded Training dataset')
     val_dataset = tf.keras.utils.image_dataset_from_directory(val_dir,batch_size=args.batch_size,label_mode='categorical',image_size=(256,256))
-    
+    print('loaded validation dataset')
     # do random cropping here 
     
     def random_crop_op(img,label):
@@ -109,7 +109,6 @@ def get_imagenet_dataset(args):
     return train_dataset, val_dataset
 
 
-
 def preprocess_dataset(args,train_dataset,test_dataset):
     """
     train_dataset : tf.data.Dataset
@@ -123,8 +122,6 @@ def preprocess_dataset(args,train_dataset,test_dataset):
         return cifar100_preproc(train_dataset,test_dataset)
     elif args.dataset == 'imagenet':
         return imgnt_preproc(train_dataset,test_dataset)
-
-
 
 
 def get_dataset(args):
@@ -153,12 +150,12 @@ def plot_training(history,args):
     
     accuracy = history.history['accuracy']
     val_accuracy = history.history['val_accuracy']
-    top5_acc = history.history['top5_acc']
+    val_top5_acc = history.history['val_top5_acc']
     plt.figure()
     plt.title("Epoch vs Accuracy")
     plt.plot(accuracy,label='training accuracy')
     plt.plot(val_accuracy,label='val_accuracy')
-    plt.plot(top5_acc,label='top5 accuracy')
+    plt.plot(val_top5_acc,label='top5 accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend(loc='lower right')
