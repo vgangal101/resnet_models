@@ -77,7 +77,7 @@ def get_imagenet_labels_classes(args):
 
 def get_imagenet_dataset(args):
     
-    labels_map, labels_list = get_imagenet_labels_classes(args)
+    #labels_map, labels_list = get_imagenet_labels_classes(args)
     
     base_dir = args.imgnt_data_path
     
