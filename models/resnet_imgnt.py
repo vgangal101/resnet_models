@@ -9,7 +9,7 @@ def bottleneck_conv_block(input_tensor,filters,strides=(2,2)):
     """
 
     out = keras.layers.Conv2D(filters[0],(1,1),strides=strides, padding = 'valid',
-                              kernel_initializer='he_normal',bias_initializer='he_normal',
+                              kernel_initializer='he_normal',
                               kernel_regularizer= tf.keras.regularizers.L2(l2=1e-4),
                               bias_regularizer= tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
 
@@ -18,14 +18,14 @@ def bottleneck_conv_block(input_tensor,filters,strides=(2,2)):
 
 
     out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
-                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
     out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='valid',
-                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_initializer='he_normal',
                                  kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     out = tf.keras.layers.BatchNormalization()(out)
@@ -51,7 +51,7 @@ def bottleneck_identity_block(input_tensor,filters):
 
 
     out = keras.layers.Conv2D(filters[0], (1,1), strides=1, padding = 'valid',
-                              kernel_initializer ='he_normal',bias_initializer = 'he_normal',
+                              kernel_initializer ='he_normal',
                               kernel_regularizer = tf.keras.regularizers.L2(l2=1e-4),
                               bias_regularizer = tf.keras.regularizers.L2(l2=1e-4))(input_tensor)
 
@@ -60,14 +60,14 @@ def bottleneck_identity_block(input_tensor,filters):
 
 
     out = tf.keras.layers.Conv2D(filters[1],(3,3),padding='same',
-                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     out = tf.keras.layers.BatchNormalization()(out)
     out = tf.keras.layers.Activation('relu')(out)
 
     out = tf.keras.layers.Conv2D(filters[2],(1,1),padding='valid',
-                                 kernel_initializer='he_normal',bias_initializer='he_normal',
+                                 kernel_initializer='he_normal',
                                  kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(out)
 
     out = tf.keras.layers.BatchNormalization()(out)
@@ -92,7 +92,7 @@ def ResNet50(input_shape=(224,224,3),num_classes=1000):
 
     # conv1_x layer
     out = keras.layers.Conv2D(64,(7,7),strides=2,padding='same',
-                                kernel_initializer='he_normal',bias_initializer='he_normal',
+                                kernel_initializer='he_normal',
                                 kernel_regularizer=tf.keras.regularizers.L2(l2=1e-4), bias_regularizer=tf.keras.regularizers.L2(l2=1e-4))(in_tensor)
     out = keras.layers.BatchNormalization()(out)
     out = keras.layers.Activation('relu')(out)
